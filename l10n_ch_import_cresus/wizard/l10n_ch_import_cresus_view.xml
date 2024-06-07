@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8" ?>
 <odoo>
     <record id="cresus_move_line_importer_form" model="ir.ui.view">
         <field name="name">cresus move line importer</field>
@@ -7,23 +7,25 @@
             <form>
                 <group>
                     <div>
-                        <field name="state" invisible="1"/>
-                        <field name="file" class="oe_inline"/>
+                        <field name="state" invisible="1" />
+                        <field name="file" class="oe_inline" />
                     </div>
                 </group>
                 <group>
-                    <field name="company_id"/>
-                    <field name="journal_id"/>
+                    <field name="company_id" />
+                    <field name="journal_id" />
                 </group>
                 <notebook>
                     <page string="Report">
-                        <field name="report" nolabel="1" colspan="4"/>
+                        <field name="report" nolabel="1" colspan="4" />
                     </page>
                     <page string="Import help">
                         <p>
 In order to import your Crésus file you must complete the following requirements:
-<ul><li>The accounts, analytical accounts used in the Crésus file must be previously created into Odoo.</li>
-<li>If the Crésus file uses VAT codes (i.e: IPI), please make sure you have indicated this code in the related Odoo tax (field: Crésus tax name). Warning, the Odoo tax must be 'tax included'. If the tax does not exist you have to create it.</li></ul>
+<ul><li
+                                >The accounts, analytical accounts used in the Crésus file must be previously created into Odoo.</li>
+<li
+                                >If the Crésus file uses VAT codes (i.e: IPI), please make sure you have indicated this code in the related Odoo tax (field: Crésus tax name). Warning, the Odoo tax must be 'tax included'. If the tax does not exist you have to create it.</li></ul>
                         </p>
                     </page>
                 </notebook>
