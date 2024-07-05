@@ -5,6 +5,7 @@
 import base64
 import csv
 import tempfile
+from babel.numbers import parse_decimal, NumberFormatError
 from datetime import datetime
 
 from odoo import api, exceptions, fields, models
@@ -27,6 +28,7 @@ class AccountCresusImport(models.TransientModel):
     imported_move_ids = fields.Many2many(
         "account.move", "import_cresus_move_rel", string="Imported moves"
     )
+    index = fields.Integer()
 
     HEAD_CRESUS = [
         "date",
@@ -85,7 +87,7 @@ class AccountCresusImport(models.TransientModel):
             analytic_account = analytic_account_obj.search(
                 [("code", "=", analytic_account_code)], limit=1
             )
-            line["analytic_account_id"] = analytic_account.id
+            line["analytic_distribution"] = {str(analytic_account.id): 100.00}
 
         if tax_ids:
             line["tax_ids"] = [(4, id, 0) for id in tax_ids]
@@ -99,15 +101,16 @@ class AccountCresusImport(models.TransientModel):
         :returns: generator
 
         """
-        # We use tempfile in order to avoid memory error with large files
-        with tempfile.TemporaryFile() as src:
-            content = self.file
-            delimiter = "\t"
-            src.write(content)
-            with tempfile.TemporaryFile() as decoded:
-                src.seek(0)
-                base64.decode(src, decoded)
-                decoded.seek(0)
+        Attachment = self.env["ir.attachment"]
+        csv_attachment = Attachment.search([
+            ("res_model", "=", self._name),
+            ("res_id", "=", self.id),
+            ("res_field", '=', 'file'),
+        ])
+        delimiter = "\t"
+        csv_filepath = Attachment._full_path(csv_attachment.store_fname)
+        for x in range(1):
+            with open(csv_filepath) as decoded:
                 try:
                     data = csv.DictReader(
                         decoded, fieldnames=self.HEAD_CRESUS, delimiter=delimiter
@@ -144,7 +147,6 @@ class AccountCresusImport(models.TransientModel):
             raise exceptions.ValidationError(_("Can't parse date '%s'") % date_string)
         return fields.Date.to_string(dt)
 
-    @api.multi
     def _standardise_data(self, data):
         """split accounting lines where needed
 
@@ -167,14 +169,18 @@ class AccountCresusImport(models.TransientModel):
             previous_pce = line_cresus["pce"]
             previous_date = line_cresus["date"]
 
-            from babel.numbers import parse_decimal
+            try:
+                recto_amount_decimal = parse_decimal(line_cresus["amount"], locale="de_CH")
+            except NumberFormatError:
+                # replacing old version of group separator
+                recto_amount_decimal = parse_decimal(line_cresus["amount"].replace("'", "’"), locale="de_CH")
+            recto_amount = float(recto_amount_decimal)
 
-            recto_amount = float(parse_decimal(line_cresus["amount"], locale="de_CH"))
             verso_amount = 0.0
             if recto_amount < 0:
                 recto_amount, verso_amount = 0.0, -recto_amount
 
-            tax_ids = [previous_tax_id] if previous_tax_id is not None else []
+            tax_ids = [previous_tax_id] if previous_tax_id else []
             previous_tax_id = None
             if line_cresus["debit"] != "...":
                 line = self.prepare_line(
@@ -208,7 +214,6 @@ class AccountCresusImport(models.TransientModel):
             lines, date=line_cresus["date"], ref=previous_pce, journal_id=journal_id
         )
 
-    @api.multi
     def _import_file(self):
         self.index = 0
         data = self._parse_csv()
@@ -217,8 +222,8 @@ class AccountCresusImport(models.TransientModel):
             self.with_context(dont_create_taxes=True).write(
                 {"imported_move_ids": [(0, False, mv)]}
             )
+            self.invalidate_cache(fnames=["imported_move_ids"])
 
-    @api.multi
     def import_file(self):
         try:
             self._import_file()
