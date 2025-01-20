@@ -2,14 +2,16 @@
 # Copyright 2016 Open Net Sàrl
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-import base64
 import csv
-import tempfile
-from babel.numbers import parse_decimal, NumberFormatError
+import logging
 from datetime import datetime
 
-from odoo import api, exceptions, fields, models
+from babel.numbers import NumberFormatError, parse_decimal
+
+from odoo import exceptions, fields, models
 from odoo.tools.translate import _
+
+_logger = logging.getLogger(__name__)
 
 
 class AccountCresusImport(models.TransientModel):
@@ -59,6 +61,7 @@ class AccountCresusImport(models.TransientModel):
         cresus_tax_code,
         analytic_account_code,
         tax_ids,
+        currency_id,
     ):
         account_obj = self.env["account.account"]
         tax_obj = self.env["account.tax"]
@@ -68,6 +71,7 @@ class AccountCresusImport(models.TransientModel):
         line["name"] = name
         line["debit"] = debit_amount
         line["credit"] = credit_amount
+        line["currency_id"] = currency_id
 
         account = account_obj.search([("code", "=", account_code)], limit=1)
         if not account:
@@ -102,11 +106,13 @@ class AccountCresusImport(models.TransientModel):
 
         """
         Attachment = self.env["ir.attachment"]
-        csv_attachment = Attachment.search([
-            ("res_model", "=", self._name),
-            ("res_id", "=", self.id),
-            ("res_field", '=', 'file'),
-        ])
+        csv_attachment = Attachment.search(
+            [
+                ("res_model", "=", self._name),
+                ("res_id", "=", self.id),
+                ("res_field", "=", "file"),
+            ]
+        )
         delimiter = "\t"
         csv_filepath = Attachment._full_path(csv_attachment.store_fname)
         for x in range(1):
@@ -170,10 +176,14 @@ class AccountCresusImport(models.TransientModel):
             previous_date = line_cresus["date"]
 
             try:
-                recto_amount_decimal = parse_decimal(line_cresus["amount"], locale="de_CH")
+                recto_amount_decimal = parse_decimal(
+                    line_cresus["amount"], locale="de_CH"
+                )
             except NumberFormatError:
                 # replacing old version of group separator
-                recto_amount_decimal = parse_decimal(line_cresus["amount"].replace("'", "’"), locale="de_CH")
+                recto_amount_decimal = parse_decimal(
+                    line_cresus["amount"].replace("'", "’"), locale="de_CH"
+                )
             recto_amount = float(recto_amount_decimal)
 
             verso_amount = 0.0
@@ -191,6 +201,7 @@ class AccountCresusImport(models.TransientModel):
                     cresus_tax_code=line_cresus["typtvat"],
                     analytic_account_code=line_cresus["analytic_account"],
                     tax_ids=tax_ids,
+                    currency_id=self.journal_id.currency_id.id,
                 )
                 lines.append(line)
                 if "tax_line_id" in line:
@@ -205,6 +216,7 @@ class AccountCresusImport(models.TransientModel):
                     cresus_tax_code=line_cresus["typtvat"],
                     analytic_account_code=line_cresus["analytic_account"],
                     tax_ids=tax_ids,
+                    currency_id=self.journal_id.currency_id.id,
                 )
                 lines.append(line)
                 if "tax_line_id" in line:
@@ -228,6 +240,7 @@ class AccountCresusImport(models.TransientModel):
         try:
             self._import_file()
         except Exception as exc:
+            _logger.exception(exc)
             self.env.cr.rollback()
             self.write(
                 {

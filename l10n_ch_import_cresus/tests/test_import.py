@@ -7,8 +7,6 @@ import logging
 import tempfile
 
 import odoo.tests.common as common
-from io import BytesIO
-
 from odoo.modules import get_resource_path
 
 _logger = logging.getLogger(__name__)
@@ -20,7 +18,6 @@ class TestImport(common.TransactionCase):
 
         tax_obj = self.env["account.tax"]
         account_obj = self.env["account.account"]
-        analytic_account_obj = self.env["account.analytic.account"]
 
         for code in [
             "1000",
