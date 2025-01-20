@@ -71,7 +71,8 @@ class AccountCresusImport(models.TransientModel):
         line["name"] = name
         line["debit"] = debit_amount
         line["credit"] = credit_amount
-        line["currency_id"] = currency_id
+        if currency_id:
+            line["currency_id"] = currency_id
 
         account = account_obj.search([("code", "=", account_code)], limit=1)
         if not account:
