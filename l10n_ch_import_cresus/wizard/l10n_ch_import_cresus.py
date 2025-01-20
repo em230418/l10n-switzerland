@@ -61,7 +61,6 @@ class AccountCresusImport(models.TransientModel):
         cresus_tax_code,
         analytic_account_code,
         tax_ids,
-        currency_id,
     ):
         account_obj = self.env["account.account"]
         tax_obj = self.env["account.tax"]
@@ -71,13 +70,13 @@ class AccountCresusImport(models.TransientModel):
         line["name"] = name
         line["debit"] = debit_amount
         line["credit"] = credit_amount
-        if currency_id:
-            line["currency_id"] = currency_id
 
         account = account_obj.search([("code", "=", account_code)], limit=1)
         if not account:
             raise exceptions.MissingError(_("No account with code %s") % account_code)
         line["account_id"] = account.id
+        if account.currency_id:
+            line["currency_id"] = account.currency_id.id
 
         if cresus_tax_code:
             tax = tax_obj.search(
@@ -202,7 +201,6 @@ class AccountCresusImport(models.TransientModel):
                     cresus_tax_code=line_cresus["typtvat"],
                     analytic_account_code=line_cresus["analytic_account"],
                     tax_ids=tax_ids,
-                    currency_id=self.journal_id.currency_id.id,
                 )
                 lines.append(line)
                 if "tax_line_id" in line:
@@ -217,7 +215,6 @@ class AccountCresusImport(models.TransientModel):
                     cresus_tax_code=line_cresus["typtvat"],
                     analytic_account_code=line_cresus["analytic_account"],
                     tax_ids=tax_ids,
-                    currency_id=self.journal_id.currency_id.id,
                 )
                 lines.append(line)
                 if "tax_line_id" in line:
